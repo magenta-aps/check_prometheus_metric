@@ -7,6 +7,8 @@ PROMETHEUS_PORT=8090
 PUSHGATEWAY_NAME=nagios_plugins_pushgateway
 PUSHGATEWAY_PORT=8091
 
+source tests/utils.sh
+
 echo ""
 echo "Creating configuration file"
 CONFIG_FILE=$(mktemp --suffix=.yml)
@@ -46,7 +48,20 @@ until $(curl --output /dev/null --silent --fail http://localhost:${PUSHGATEWAY_P
     sleep 1
 done
 
+echo ""
+echo "Pushing pi to pushgateway"
+echo "pi 3.14" | curl --data-binary @- http://localhost:${PUSHGATEWAY_PORT}/metrics/job/constants
 
+echo ""
+echo "Waiting until prometheus sees itself"
+QUERY_SCALAR_UP="scalar(up{instance=\"localhost:9090\"})"
+wait_for_metric "${QUERY_SCALAR_UP}" ${PROMETHEUS_PORT}
+echo ""
+
+echo ""
+echo "Waiting until prometheus sees pushed metric"
+wait_for_metric "scalar(pi)" ${PROMETHEUS_PORT}
+echo ""
 
 TOTAL_FAILED_TESTS=0
 echo ""

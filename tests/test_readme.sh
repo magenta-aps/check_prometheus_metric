@@ -7,20 +7,10 @@ PUSHGATEWAY_PORT=$3
 
 PROMETHEUS_SERVER=http://localhost:${PROMETHEUS_PORT}
 
+source tests/utils.sh
+
 QUERY_SCALAR_UP="scalar(up{instance=\"localhost:9090\"})"
 QUERY_VECTOR_UP="up{instance=\"localhost:9090\"}"
-
-TOTAL_TESTS=0
-TOTAL_FAILS=0
-function check() {
-    TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    if [ "$1" != "$2" ]; then
-        TOTAL_FAILS=$((TOTAL_FAILS + 1))
-        echo -e "x\c"
-    else
-        echo -e ".\c"
-    fi
-}
 
 RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" -q $QUERY_SCALAR_UP -w 1 -c 1 -n $QUERY_SCALAR_UP -m lt)
 EXPECTED="OK - ${QUERY_SCALAR_UP} is 1"
