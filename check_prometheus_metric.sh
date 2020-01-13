@@ -12,7 +12,7 @@ COMPARISON_METHOD=ge
 NAN_OK="false"
 NAGIOS_INFO="false"
 PERFDATA="false"
-PROMETHEUS_QUERY_TYPE="scalar"
+PROMETHEUS_QUERY_TYPE=""
 
 # Nagios status codes:
 OK=0
@@ -56,8 +56,6 @@ function usage {
     -O               Accept NaN as an "OK" result .
     -i               Print the extra metric information into the Nagios message.
     -p               Add perfdata to check output.
-    -t QUERY_TYPE    Prometheus query return type: scalar (default) or vector.
-                     The first element of the vector is used for the check.
 
 EoL
 }
@@ -113,16 +111,6 @@ function process_command_line {
       p)        PERFDATA="true"
                 ;;
 
-      t)        if [[ ${OPTARG} =~ ^(scalar|vector)$ ]]
-                then
-                  PROMETHEUS_QUERY_TYPE=${OPTARG}
-                else
-                  NAGIOS_SHORT_TEXT="invalid comparison method: ${OPTARG}"
-                  NAGIOS_LONG_TEXT="$(usage)"
-                  exit
-                fi
-                ;;
-
       \?)       NAGIOS_SHORT_TEXT="invalid option: -$OPTARG"
                 NAGIOS_LONG_TEXT="$(usage)"
                 exit
@@ -138,7 +126,6 @@ function process_command_line {
   # check for missing parameters
   if [[ -z ${PROMETHEUS_SERVER} ]] ||
      [[ -z ${PROMETHEUS_QUERY} ]] ||
-     [[ -z ${PROMETHEUS_QUERY_TYPE} ]] ||
      [[ -z ${METRIC_NAME} ]] ||
      [[ -z ${WARNING_LEVEL} ]] ||
      [[ -z ${CRITICAL_LEVEL} ]]
@@ -176,7 +163,7 @@ function get_prometheus_raw_result {
 
   local _RESULT
 
-  _RESULT=$(curl -sgG "${CURL_OPTS[@]}" --data-urlencode "query=${PROMETHEUS_QUERY}" "${PROMETHEUS_SERVER}/api/v1/query" | jq -r '.data.result')
+  _RESULT=$(curl -sgG "${CURL_OPTS[@]}" --data-urlencode "query=${PROMETHEUS_QUERY}" "${PROMETHEUS_SERVER}/api/v1/query")
   printf '%s' "${_RESULT}"
 
 }
@@ -230,11 +217,13 @@ trap on_exit EXIT TERM
 process_command_line "$@"
 
 # get the raw query from prometheus
-PROMETHEUS_RAW_RESULT="$( get_prometheus_raw_result )"
+PROMETHEUS_RAW_RESPONSE="$( get_prometheus_raw_result )"
+
+PROMETHEUS_QUERY_TYPE=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.resultType')
+PROMETHEUS_RAW_RESULT=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.result')
 
 # extract the metric value from the raw prometheus result
-if [[ "${PROMETHEUS_QUERY_TYPE}" = "scalar" ]]
-then
+if [[ "${PROMETHEUS_QUERY_TYPE}" = "scalar" ]]; then
     PROMETHEUS_RESULT=$( get_prometheus_scalar_result "$PROMETHEUS_RAW_RESULT" )
     PROMETHEUS_METRIC=UNKNOWN
 else
