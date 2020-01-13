@@ -12,6 +12,7 @@ function wait_for_metric() {
 TOTAL_TESTS=0
 TOTAL_FAILS=0
 function check() {
+    # TODO: Check exit-code against OK/WARNING/CRITICAL/UNKNOWN
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     if [ "$1" != "$2" ]; then
         TOTAL_FAILS=$((TOTAL_FAILS + 1))
@@ -27,7 +28,9 @@ function parameterized_tests() {
     while IFS= read -r line; do
         PARAMETERS=$(echo "$line" | cut -f1 -d'#')
         EXPECTED=$(echo "$line" | cut -f2 -d'#')
-        RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" ${PARAMETERS} -n "tc" | head -1)
-        check "$RESULT" "$EXPECTED"
+        OUTPUT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" ${PARAMETERS} -n "tc")
+        EXIT_CODE=$?
+        RESULT=$(echo "${OUTPUT}" | head -1)
+        check "$RESULT" "$EXPECTED" "EXIT_CODE"
     done <<< "$1"
 }
