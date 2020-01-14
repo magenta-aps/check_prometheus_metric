@@ -142,7 +142,7 @@ function process_command_line {
                 ;;
 
       t)        
-                NAGIOS_SHORT_TEXT="deprecated argument provided: ${OPTARG}"
+                NAGIOS_SHORT_TEXT="deprecated argument provided: -t ${OPTARG}"
                 NAGIOS_LONG_TEXT="$(usage)"
                 exit
                 ;;

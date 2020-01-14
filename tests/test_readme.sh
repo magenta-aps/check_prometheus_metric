@@ -20,11 +20,11 @@ RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" -q $QUERY_SCALAR_UP -w 
 EXPECTED="OK - ${QUERY_SCALAR_UP} is 1: UNKNOWN"
 check "$RESULT" "$EXPECTED"
 
-RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" -q $QUERY_VECTOR_UP -w 1 -c 1 -n $QUERY_VECTOR_UP -m lt -t vector)
+RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" -q $QUERY_VECTOR_UP -w 1 -c 1 -n $QUERY_VECTOR_UP -m lt)
 EXPECTED="OK - ${QUERY_VECTOR_UP} is 1"
 check "$RESULT" "$EXPECTED"
 
-RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" -q $QUERY_VECTOR_UP -w 1 -c 1 -n $QUERY_VECTOR_UP -m lt -t vector -i)
+RESULT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" -q $QUERY_VECTOR_UP -w 1 -c 1 -n $QUERY_VECTOR_UP -m lt -i)
 EXPECTED="OK - ${QUERY_VECTOR_UP} is 1: { __name__: up, instance: localhost:9090, job: prometheus }"
 check "$RESULT" "$EXPECTED"
 
