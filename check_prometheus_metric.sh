@@ -56,11 +56,11 @@ function usage() {
   Usage:
   check_prometheus_metric.sh -H HOST -q QUERY -w INT[:INT] -c INT[:INT] -n NAME [-m METHOD] [-O] [-i] [-p] [-t QUERY_TYPE]
 
-  options:
+  Options:
     -H HOST          URL of Prometheus host to query.
     -q QUERY         Prometheus query, in single quotes, that returns by default a float or int (see -t).
-    -w INT[:INT]     Warning level value (must be zero or positive).
-    -c INT[:INT]     Critical level value (must be zero or positive).
+    -w INT[:INT]     Warning level value (must be a positive integer or interval).
+    -c INT[:INT]     Critical level value (must be a positive integer or interval).
     -n NAME          A name for the metric being checked.
     -m METHOD        Comparison method, one of gt, ge, lt, le, eq, ne.
                      (Defaults to ge unless otherwise specified.)
@@ -70,6 +70,15 @@ function usage() {
     -O               Accept NaN as an "OK" result .
     -i               Print the extra metric information into the Nagios message.
     -p               Add perfdata to check output.
+
+  Examples:
+    check_prometheus_metric -q 'up{job=\"job_name\"}' :1 -c :1  # Check that job is up.
+    
+    check_prometheus_metric -q 'node_load1' -w :0.05 -c :0.1  # Check load is OK.
+    # Aka. that load is below 0.05 and 0.1 respectively.
+
+    check_prometheus_metric -q 'go_threads' -w 15:25 -c :  # Check thread count is OK.
+    # Aka. OK if we have 15-25 threads, outside of this; warning, never critical.
 
 EoL
 }
@@ -184,9 +193,18 @@ function process_command_line {
 
   # Derive intervals
   CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
-  CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
   WARNING_LEVEL_LOW=$(echo ${WARNING_LEVEL} | cut -f1 -d':')
-  WARNING_LEVEL_HIGH=$(echo ${WARNING_LEVEL} | cut -f2 -d':')
+  if is_interval ${WARNING_LEVEL}; then
+      WARNING_LEVEL_HIGH=$(echo ${WARNING_LEVEL} | cut -f2 -d':')
+  fi
+  if is_interval ${CRITICAL_LEVEL}; then
+      CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
+  fi
+  CRITICAL_LEVEL_REP_LOW=${CRITICAL_LEVEL_LOW}
+  CRITICAL_LEVEL_REP_HIGH=${CRITICAL_LEVEL_HIGH}
+  WARNING_LEVEL_REP_LOW=${WARNING_LEVEL_LOW}
+  WARNING_LEVEL_REP_HIGH=${WARNING_LEVEL_HIGH}
+
   CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL_LOW:='-inf'}
   CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_HIGH:='inf'}
   WARNING_LEVEL_LOW=${WARNING_LEVEL_LOW:='-inf'}
@@ -285,11 +303,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # check the value
     if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
       # JSON raw data
-      JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical\": ${CRITICAL_LEVEL}, \"warning\": ${WARNING_LEVEL}}"
+      JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical_low\": ${CRITICAL_LEVEL_LOW}, \"critical_high\": ${CRITICAL_LEVEL_HIGH}, \"warning_low\": ${WARNING_LEVEL_LOW}, \"warning_high\": ${WARNING_LEVEL_HIGH}}"
       # Evaluate critical and warning levels
-      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .critical" >/dev/null
+      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .critical_low" >/dev/null
       CRITICAL=$?
-      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .warning" >/dev/null
+      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .warning_low" >/dev/null
       WARNING=$?
 
       if [ ${CRITICAL} -eq 0 ]; then
@@ -318,7 +336,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     if [[ "${PERFDATA}" = "true" ]]
     then
-        NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT} | query_result=${PROMETHEUS_RESULT}"
+        # Bake performance data
+        PERF_DATA=""
+        PERF_DATA+="query_result=${PROMETHEUS_RESULT};${WARNING_LEVEL_REP_LOW}:${WARNING_LEVEL_REP_HIGH};${CRITICAL_LEVEL_REP_LOW}:${CRITICAL_LEVEL_REP_HIGH};0 "
+
+        NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT} | ${PERF_DATA}"
     fi
 
     exit
