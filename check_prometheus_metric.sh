@@ -193,13 +193,19 @@ function process_command_line {
 
   # Derive intervals
   CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
+  if is_interval ${CRITICAL_LEVEL}; then
+      CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
+  fi
   WARNING_LEVEL_LOW=$(echo ${WARNING_LEVEL} | cut -f1 -d':')
   if is_interval ${WARNING_LEVEL}; then
       WARNING_LEVEL_HIGH=$(echo ${WARNING_LEVEL} | cut -f2 -d':')
   fi
-  if is_interval ${CRITICAL_LEVEL}; then
-      CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
+
+  if [[ "${COMPARISON_METHOD}" =~ ^(eq)$ ]]; then
+      CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_LOW}
+      WARNING_LEVEL_HIGH=${WARNING_LEVEL_LOW}
   fi
+
   CRITICAL_LEVEL_REP_LOW=${CRITICAL_LEVEL_LOW}
   CRITICAL_LEVEL_REP_HIGH=${CRITICAL_LEVEL_HIGH}
   WARNING_LEVEL_REP_LOW=${WARNING_LEVEL_LOW}
@@ -304,10 +310,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
       # JSON raw data
       JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical_low\": ${CRITICAL_LEVEL_LOW}, \"critical_high\": ${CRITICAL_LEVEL_HIGH}, \"warning_low\": ${WARNING_LEVEL_LOW}, \"warning_high\": ${WARNING_LEVEL_HIGH}}"
+      echo "${JSON}" | jq . 1>&2
       # Evaluate critical and warning levels
-      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .critical_low" >/dev/null
+      echo "${JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .value and .value ${COMPARISON_OPERATOR} .critical_high" >/dev/null
       CRITICAL=$?
-      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .warning_low" >/dev/null
+      echo "${JSON}" | jq -e ".warning_low ${COMPARISON_OPERATOR} .value and .value ${COMPARISON_OPERATOR} .warning_high" >/dev/null
       WARNING=$?
 
       if [ ${CRITICAL} -eq 0 ]; then
