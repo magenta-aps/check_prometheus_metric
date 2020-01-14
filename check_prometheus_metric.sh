@@ -233,14 +233,23 @@ else
 fi
 
 # check the value
-if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]
-then
-  if eval [[ ${PROMETHEUS_RESULT} -${COMPARISON_METHOD} ${CRITICAL_LEVEL} ]]
-  then
+if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
+  # List of valid operators
+  OPERATORS_JSON='{"gt": ">", "ge": ">=", "lt": "<", "le": "<=", "eq": "==", "ne": "!="}'
+  # jq query to pick out the selected operator
+  OPERATOR=$(echo "${OPERATORS_JSON}" | jq -r ".${COMPARISON_METHOD}")
+  # JSON raw data
+  JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical\": ${CRITICAL_LEVEL}, \"warning\": ${WARNING_LEVEL}}"
+  # Evaluate critical and warning levels
+  echo "${JSON}" | jq -e ".value ${OPERATOR} .critical" >/dev/null
+  CRITICAL=$?
+  echo "${JSON}" | jq -e ".value ${OPERATOR} .warning" >/dev/null
+  WARNING=$?
+
+  if [ ${CRITICAL} -eq 0 ]; then
     NAGIOS_STATUS=CRITICAL
     NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-  elif eval [[ ${PROMETHEUS_RESULT} -${COMPARISON_METHOD} $WARNING_LEVEL ]]
-  then
+  elif [ ${WARNING} -eq 0 ]; then
     NAGIOS_STATUS=WARNING
     NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
   else
