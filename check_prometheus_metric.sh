@@ -192,18 +192,39 @@ function process_command_line {
   fi
 
   # Derive intervals
-  CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
   if is_interval ${CRITICAL_LEVEL}; then
+      CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
       CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
+  else
+      if [[ "${COMPARISON_METHOD}" == "gt" ]]; then
+          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
+      fi
+      if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
+          CRITICAL_LEVEL_LOW=$((CRITICAL_LEVEL + 1))
+      fi
+      if [[ "${COMPARISON_METHOD}" == "lt" ]]; then
+          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
+      fi
+      if [[ "${COMPARISON_METHOD}" == "le" ]]; then
+          CRITICAL_LEVEL_HIGH=$((CRITICAL_LEVEL - 1))
+      fi
   fi
-  WARNING_LEVEL_LOW=$(echo ${WARNING_LEVEL} | cut -f1 -d':')
   if is_interval ${WARNING_LEVEL}; then
+      WARNING_LEVEL_LOW=$(echo ${WARNING_LEVEL} | cut -f1 -d':')
       WARNING_LEVEL_HIGH=$(echo ${WARNING_LEVEL} | cut -f2 -d':')
-  fi
-
-  if [[ "${COMPARISON_METHOD}" =~ ^(eq)$ ]]; then
-      CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_LOW}
-      WARNING_LEVEL_HIGH=${WARNING_LEVEL_LOW}
+  else
+      if [[ "${COMPARISON_METHOD}" == "gt" ]]; then
+          WARNING_LEVEL_LOW=${WARNING_LEVEL}
+      fi
+      if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
+          WARNING_LEVEL_LOW=$((WARNING_LEVEL + 1))
+      fi
+      if [[ "${COMPARISON_METHOD}" == "lt" ]]; then
+          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
+      fi
+      if [[ "${COMPARISON_METHOD}" == "le" ]]; then
+          WARNING_LEVEL_HIGH=$((WARNING_LEVEL - 1))
+      fi
   fi
 
   CRITICAL_LEVEL_REP_LOW=${CRITICAL_LEVEL_LOW}
@@ -310,7 +331,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
       # JSON raw data
       JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical_low\": ${CRITICAL_LEVEL_LOW}, \"critical_high\": ${CRITICAL_LEVEL_HIGH}, \"warning_low\": ${WARNING_LEVEL_LOW}, \"warning_high\": ${WARNING_LEVEL_HIGH}}"
-      echo "${JSON}" | jq . 1>&2
+      # echo "${JSON}" | jq . 1>&2
       # Evaluate critical and warning levels
       echo "${JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .value and .value ${COMPARISON_OPERATOR} .critical_high" >/dev/null
       CRITICAL=$?
