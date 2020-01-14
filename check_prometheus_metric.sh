@@ -14,25 +14,39 @@ NAGIOS_INFO="false"
 PERFDATA="false"
 PROMETHEUS_QUERY_TYPE=""
 
+# Constants
+#----------
 # Nagios status codes:
 OK=0
 WARNING=1
 CRITICAL=2
 UNKNOWN=3
 
-if ! type curl >/dev/null 2>&1
-then
-  echo 'ERROR: Missing "curl" command'
-  exit ${UNKNOWN}
-fi
+# Regexes:
+# TODO: Support negative numbers
+INTEGER_REGEX="^[0-9]+$"
+INTERVAL_REGEX="^[0-9]*(\.[0-9]+)?:[0-9]*(\.[0-9]+)?$"
 
-if ! type jq >/dev/null 2>&1
-then
-  echo 'ERROR: Missing "jq" command'
-  exit ${UNKNOWN}
-fi
+# Variables:
+NAGIOS_STATUS=UNKNOWN
+NAGIOS_SHORT_TEXT='an unknown error occured'
+NAGIOS_LONG_TEXT=''
 
-function usage {
+# Code:
+function check_dependencies() {
+    if ! [ -x "$(command -v curl)" ]; then
+        NAGIOS_STATUS=UNKNOWN
+        NAGIOS_SHORT_TEXT='missing "curl" command'
+        exit
+    fi
+
+    if ! [ -x "$(command -v jq)" ]; then
+        NAGIOS_STATUS=UNKNOWN
+        NAGIOS_SHORT_TEXT='missing "jq" command'
+    fi
+}
+
+function usage() {
 
   cat <<'EoL'
 
@@ -40,13 +54,13 @@ function usage {
                                metrics. Requires curl and jq to be in $PATH.
 
   Usage:
-  check_prometheus_metric.sh -H HOST -q QUERY -w INT -c INT -n NAME [-m METHOD] [-O] [-i] [-p] [-t QUERY_TYPE]
+  check_prometheus_metric.sh -H HOST -q QUERY -w INT[:INT] -c INT[:INT] -n NAME [-m METHOD] [-O] [-i] [-p] [-t QUERY_TYPE]
 
   options:
     -H HOST          URL of Prometheus host to query.
     -q QUERY         Prometheus query, in single quotes, that returns by default a float or int (see -t).
-    -w INT           Warning level value (must be zero or positive).
-    -c INT           Critical level value (must be zero or positive).
+    -w INT[:INT]     Warning level value (must be zero or positive).
+    -c INT[:INT]     Critical level value (must be zero or positive).
     -n NAME          A name for the metric being checked.
     -m METHOD        Comparison method, one of gt, ge, lt, le, eq, ne.
                      (Defaults to ge unless otherwise specified.)
@@ -60,6 +74,25 @@ function usage {
 EoL
 }
 
+function is_integer() {
+    echo "${1}" | grep -E "${INTEGER_REGEX}" -c >/dev/null
+    IS_INTEGER=$?
+    return ${IS_INTEGER}
+}
+
+function is_interval() {
+    echo "${1}" | grep -E "${INTERVAL_REGEX}" -c >/dev/null
+    IS_INTERVAL=$?
+    return ${IS_INTERVAL}
+}
+
+function is_integer_or_interval() {
+    if is_integer "${1}" || is_interval "${1}"; then
+        return 0
+    fi
+    return 1
+}
+
 
 function process_command_line {
 
@@ -70,34 +103,31 @@ function process_command_line {
       q)        PROMETHEUS_QUERY="$OPTARG" ;;
       n)        METRIC_NAME="$OPTARG" ;;
 
-      m)        if [[ ${OPTARG} =~ ^([lg][et]|eq|ne)$ ]]
-                then
-                  COMPARISON_METHOD=${OPTARG}
-                else
-                  NAGIOS_SHORT_TEXT="invalid comparison method: ${OPTARG}"
-                  NAGIOS_LONG_TEXT="$(usage)"
-                  exit
+      m)        # If invalid operator name
+                if ! [[ ${OPTARG} =~ ^([lg][et]|eq|ne)$ ]]; then
+                    NAGIOS_SHORT_TEXT="invalid comparison method: ${OPTARG}"
+                    NAGIOS_LONG_TEXT="$(usage)"
+                    exit
                 fi
+                COMPARISON_METHOD=${OPTARG}
                 ;;
 
-      c)        if [[ ${OPTARG} =~ ^[0-9]+$ ]]
-                then
-                  CRITICAL_LEVEL=${OPTARG}
-                else
-                  NAGIOS_SHORT_TEXT='-c CRITICAL_LEVEL requires an integer'
+      c)        # If malformed
+                if ! is_integer_or_interval "${OPTARG}"; then
+                  NAGIOS_SHORT_TEXT='-c CRITICAL_LEVEL requires an integer or interval'
                   NAGIOS_LONG_TEXT="$(usage)"
                   exit
                 fi
+                CRITICAL_LEVEL=${OPTARG}
                 ;;
 
-      w)        if [[ ${OPTARG} =~ ^[0-9]+$ ]]
-                then
-                  WARNING_LEVEL=${OPTARG}
-                else
-                  NAGIOS_SHORT_TEXT='-w WARNING_LEVEL requires an integer'
+      w)        # If malformed
+                if ! is_integer_or_interval "${OPTARG}"; then
+                  NAGIOS_SHORT_TEXT='-w WARNING_LEVEL requires an integer or interval'
                   NAGIOS_LONG_TEXT="$(usage)"
                   exit
                 fi
+                WARNING_LEVEL=${OPTARG}
                 ;;
 
       C)        CURL_OPTS+=("${OPTARG}")
@@ -109,6 +139,12 @@ function process_command_line {
                 ;;
 
       p)        PERFDATA="true"
+                ;;
+
+      t)        
+                NAGIOS_SHORT_TEXT="deprecated argument provided: ${OPTARG}"
+                NAGIOS_LONG_TEXT="$(usage)"
+                exit
                 ;;
 
       \?)       NAGIOS_SHORT_TEXT="invalid option: -$OPTARG"
@@ -134,28 +170,27 @@ function process_command_line {
     NAGIOS_LONG_TEXT="$(usage)"
     exit
   fi
-}
 
-function on_exit {
-
-  if [[ -z ${NAGIOS_STATUS} ]]
-  then
-    NAGIOS_STATUS=UNKNOWN
+  # List of valid operators
+  COMPARISON_OPERATORS='{"gt": ">", "ge": ">=", "lt": "<", "le": "<=", "eq": "==", "ne": "!="}'
+  # jq query to pick out the selected operator
+  COMPARISON_OPERATOR=$(echo "${COMPARISON_OPERATORS}" | jq -r ".${COMPARISON_METHOD}")
+  # If operator was not found
+  if [ ${COMPARISON_OPERATOR} == 'null' ]; then
+      NAGIOS_SHORT_TEXT="Unable to find comparison method: ${OPTARG}"
+      NAGIOS_LONG_TEXT="$(usage)"
+      exit
   fi
 
-  if [[ -z ${NAGIOS_SHORT_TEXT} ]]
-  then
-    NAGIOS_SHORT_TEXT='an unknown error occured'
-  fi
-
-  printf '%s - %s\n' ${NAGIOS_STATUS} "${NAGIOS_SHORT_TEXT}"
-
-  if [[ -n ${NAGIOS_LONG_TEXT} ]]
-  then
-    printf '%s\n' "${NAGIOS_LONG_TEXT}"
-  fi
-
-  exit ${!NAGIOS_STATUS} # hint: an indirect variable reference
+  # Derive intervals
+  CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
+  CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
+  WARNING_LEVEL_LOW=$(echo ${WARNING_LEVEL} | cut -f1 -d':')
+  WARNING_LEVEL_HIGH=$(echo ${WARNING_LEVEL} | cut -f2 -d':')
+  CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL_LOW:='-inf'}
+  CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_HIGH:='inf'}
+  WARNING_LEVEL_LOW=${WARNING_LEVEL_LOW:='-inf'}
+  WARNING_LEVEL_HIGH=${WARNING_LEVEL_HIGH:='inf'}
 }
 
 
@@ -210,69 +245,81 @@ function get_prometheus_vector_metric {
 
 }
 
-# set up exit function
-trap on_exit EXIT TERM
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Exit trigger
+    #-------------
+    # Function to be trapped on exit
+    function on_exit {
+        printf '%s - %s\n' ${NAGIOS_STATUS} "${NAGIOS_SHORT_TEXT}"
 
-# process the cli options
-process_command_line "$@"
+        if [[ -n ${NAGIOS_LONG_TEXT} ]]; then
+            printf '%s\n' "${NAGIOS_LONG_TEXT}"
+        fi
+        # Indirect variable reference
+        exit ${!NAGIOS_STATUS}
+    }
 
-# get the raw query from prometheus
-PROMETHEUS_RAW_RESPONSE="$( get_prometheus_raw_result )"
+    # Set up exit function
+    trap on_exit EXIT TERM
 
-PROMETHEUS_QUERY_TYPE=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.resultType')
-PROMETHEUS_RAW_RESULT=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.result')
+    check_dependencies
+    # process the cli options
+    process_command_line "$@"
 
-# extract the metric value from the raw prometheus result
-if [[ "${PROMETHEUS_QUERY_TYPE}" = "scalar" ]]; then
-    PROMETHEUS_RESULT=$( get_prometheus_scalar_result "$PROMETHEUS_RAW_RESULT" )
-    PROMETHEUS_METRIC=UNKNOWN
-else
-    PROMETHEUS_VALUE=$( get_prometheus_vector_value "$PROMETHEUS_RAW_RESULT" )
-    PROMETHEUS_RESULT=$( get_prometheus_scalar_result "$PROMETHEUS_VALUE" )
-    PROMETHEUS_METRIC=$( get_prometheus_vector_metric "$PROMETHEUS_RAW_RESULT" ) 
+    # get the raw query from prometheus
+    PROMETHEUS_RAW_RESPONSE="$( get_prometheus_raw_result )"
+
+    PROMETHEUS_QUERY_TYPE=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.resultType')
+    PROMETHEUS_RAW_RESULT=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.result')
+
+    # extract the metric value from the raw prometheus result
+    if [[ "${PROMETHEUS_QUERY_TYPE}" = "scalar" ]]; then
+        PROMETHEUS_RESULT=$( get_prometheus_scalar_result "$PROMETHEUS_RAW_RESULT" )
+        PROMETHEUS_METRIC=UNKNOWN
+    else
+        PROMETHEUS_VALUE=$( get_prometheus_vector_value "$PROMETHEUS_RAW_RESULT" )
+        PROMETHEUS_RESULT=$( get_prometheus_scalar_result "$PROMETHEUS_VALUE" )
+        PROMETHEUS_METRIC=$( get_prometheus_vector_metric "$PROMETHEUS_RAW_RESULT" ) 
+    fi
+
+    # check the value
+    if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
+      # JSON raw data
+      JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical\": ${CRITICAL_LEVEL}, \"warning\": ${WARNING_LEVEL}}"
+      # Evaluate critical and warning levels
+      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .critical" >/dev/null
+      CRITICAL=$?
+      echo "${JSON}" | jq -e ".value ${COMPARISON_OPERATOR} .warning" >/dev/null
+      WARNING=$?
+
+      if [ ${CRITICAL} -eq 0 ]; then
+        NAGIOS_STATUS=CRITICAL
+        NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
+      elif [ ${WARNING} -eq 0 ]; then
+        NAGIOS_STATUS=WARNING
+        NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
+      else
+        NAGIOS_STATUS=OK
+        NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
+      fi
+    else
+      if [[ "${NAN_OK}" = "true" && "${PROMETHEUS_RESULT}" = "NaN" ]]
+      then
+        NAGIOS_STATUS=OK
+        NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
+      else    
+        NAGIOS_SHORT_TEXT="unable to parse prometheus response"
+        NAGIOS_LONG_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
+      fi
+    fi
+    if [[ "${NAGIOS_INFO}" = "true" ]]
+    then
+        NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT}: ${PROMETHEUS_METRIC}"
+    fi
+    if [[ "${PERFDATA}" = "true" ]]
+    then
+        NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT} | query_result=${PROMETHEUS_RESULT}"
+    fi
+
+    exit
 fi
-
-# check the value
-if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
-  # List of valid operators
-  OPERATORS_JSON='{"gt": ">", "ge": ">=", "lt": "<", "le": "<=", "eq": "==", "ne": "!="}'
-  # jq query to pick out the selected operator
-  OPERATOR=$(echo "${OPERATORS_JSON}" | jq -r ".${COMPARISON_METHOD}")
-  # JSON raw data
-  JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical\": ${CRITICAL_LEVEL}, \"warning\": ${WARNING_LEVEL}}"
-  # Evaluate critical and warning levels
-  echo "${JSON}" | jq -e ".value ${OPERATOR} .critical" >/dev/null
-  CRITICAL=$?
-  echo "${JSON}" | jq -e ".value ${OPERATOR} .warning" >/dev/null
-  WARNING=$?
-
-  if [ ${CRITICAL} -eq 0 ]; then
-    NAGIOS_STATUS=CRITICAL
-    NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-  elif [ ${WARNING} -eq 0 ]; then
-    NAGIOS_STATUS=WARNING
-    NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-  else
-    NAGIOS_STATUS=OK
-    NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-  fi
-else
-  if [[ "${NAN_OK}" = "true" && "${PROMETHEUS_RESULT}" = "NaN" ]]
-  then
-    NAGIOS_STATUS=OK
-    NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-  else    
-    NAGIOS_SHORT_TEXT="unable to parse prometheus response"
-    NAGIOS_LONG_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-  fi
-fi
-if [[ "${NAGIOS_INFO}" = "true" ]]
-then
-    NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT}: ${PROMETHEUS_METRIC}"
-fi
-if [[ "${PERFDATA}" = "true" ]]
-then
-    NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT} | query_result=${PROMETHEUS_RESULT}"
-fi
-
-exit

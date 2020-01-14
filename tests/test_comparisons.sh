@@ -65,10 +65,10 @@ TESTS="
 -q 1 -w 2 #UNKNOWN - missing required option
 -q 1 -c 3 #UNKNOWN - missing required option
 # Invalid warning / critical argument
--q 1 -w 2 -c -1 #UNKNOWN - -c CRITICAL_LEVEL requires an integer
--q 1 -w -1 -c 3 #UNKNOWN - -w WARNING_LEVEL requires an integer
--q 1 -w 2 -c one #UNKNOWN - -c CRITICAL_LEVEL requires an integer
--q 1 -w one -c 3 #UNKNOWN - -w WARNING_LEVEL requires an integer
+-q 1 -w 2 -c -1 #UNKNOWN - -c CRITICAL_LEVEL requires an integer or interval
+-q 1 -w -1 -c 3 #UNKNOWN - -w WARNING_LEVEL requires an integer or interval
+-q 1 -w 2 -c one #UNKNOWN - -c CRITICAL_LEVEL requires an integer or interval
+-q 1 -w one -c 3 #UNKNOWN - -w WARNING_LEVEL requires an integer or interval
 # Invalid comparision operator
 -q 1 -w 2 -c 3 -m above #UNKNOWN - invalid comparison method: above
 -q 1 -w 2 -c 3 -m below #UNKNOWN - invalid comparison method: below

@@ -17,7 +17,7 @@ function check() {
     if [ "$1" != "$2" ]; then
         TOTAL_FAILS=$((TOTAL_FAILS + 1))
         printf "x"
-        # printf "\n$1 != $2\n"
+        printf "\n$1 != $2 ($3)\n"
     else
         printf "."
     fi
@@ -31,6 +31,11 @@ function parameterized_tests() {
         OUTPUT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" ${PARAMETERS} -n "tc")
         EXIT_CODE=$?
         RESULT=$(echo "${OUTPUT}" | head -1)
-        check "$RESULT" "$EXPECTED" "EXIT_CODE"
+        check "$RESULT" "$EXPECTED" "$line" "$EXIT_CODE"
     done <<< "$1"
+}
+
+function print_exit() {
+    $1
+    echo $?
 }
