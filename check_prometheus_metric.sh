@@ -180,17 +180,6 @@ function process_command_line {
     exit
   fi
 
-  # List of valid operators
-  COMPARISON_OPERATORS='{"gt": ">", "ge": ">=", "lt": "<", "le": "<=", "eq": "==", "ne": "!="}'
-  # jq query to pick out the selected operator
-  COMPARISON_OPERATOR=$(echo "${COMPARISON_OPERATORS}" | jq -r ".${COMPARISON_METHOD}")
-  # If operator was not found
-  if [ ${COMPARISON_OPERATOR} == 'null' ]; then
-      NAGIOS_SHORT_TEXT="Unable to find comparison method: ${OPTARG}"
-      NAGIOS_LONG_TEXT="$(usage)"
-      exit
-  fi
-
   # Derive intervals
   if is_interval ${CRITICAL_LEVEL}; then
       CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
@@ -200,13 +189,22 @@ function process_command_line {
           CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
       fi
       if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
-          CRITICAL_LEVEL_LOW=$((CRITICAL_LEVEL + 1))
+          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
       fi
       if [[ "${COMPARISON_METHOD}" == "lt" ]]; then
           CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
+          SET_COMPARISON_METHOD="gt"
       fi
       if [[ "${COMPARISON_METHOD}" == "le" ]]; then
-          CRITICAL_LEVEL_HIGH=$((CRITICAL_LEVEL - 1))
+          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
+          SET_COMPARISON_METHOD="ge"
+      fi
+      if [[ "${COMPARISON_METHOD}" == "eq" ]]; then
+          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
+          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
+      elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
+          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
+          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
       fi
   fi
   if is_interval ${WARNING_LEVEL}; then
@@ -217,14 +215,26 @@ function process_command_line {
           WARNING_LEVEL_LOW=${WARNING_LEVEL}
       fi
       if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
-          WARNING_LEVEL_LOW=$((WARNING_LEVEL + 1))
+          WARNING_LEVEL_LOW=${WARNING_LEVEL}
       fi
       if [[ "${COMPARISON_METHOD}" == "lt" ]]; then
           WARNING_LEVEL_HIGH=${WARNING_LEVEL}
+          SET_COMPARISON_METHOD="gt"
       fi
       if [[ "${COMPARISON_METHOD}" == "le" ]]; then
-          WARNING_LEVEL_HIGH=$((WARNING_LEVEL - 1))
+          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
+          SET_COMPARISON_METHOD="ge"
       fi
+      if [[ "${COMPARISON_METHOD}" == "eq" ]]; then
+          WARNING_LEVEL_LOW=${WARNING_LEVEL}
+          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
+      elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
+          WARNING_LEVEL_LOW=${WARNING_LEVEL}
+          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
+      fi
+  fi
+  if [[ -n ${SET_COMPARISON_METHOD} ]]; then
+      COMPARISON_METHOD=${SET_COMPARISON_METHOD}
   fi
 
   CRITICAL_LEVEL_REP_LOW=${CRITICAL_LEVEL_LOW}
@@ -236,6 +246,17 @@ function process_command_line {
   CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_HIGH:='inf'}
   WARNING_LEVEL_LOW=${WARNING_LEVEL_LOW:='-inf'}
   WARNING_LEVEL_HIGH=${WARNING_LEVEL_HIGH:='inf'}
+
+  # List of valid operators
+  COMPARISON_OPERATORS='{"gt": "<", "ge": "<=", "lt": ">", "le": ">=", "eq": "==", "ne": "!="}'
+  # jq query to pick out the selected operator
+  COMPARISON_OPERATOR=$(echo "${COMPARISON_OPERATORS}" | jq -r ".${COMPARISON_METHOD}")
+  # If operator was not found
+  if [ ${COMPARISON_OPERATOR} == 'null' ]; then
+      NAGIOS_SHORT_TEXT="Unable to find comparison method: ${OPTARG}"
+      NAGIOS_LONG_TEXT="$(usage)"
+      exit
+  fi
 }
 
 
@@ -332,6 +353,25 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
       # JSON raw data
       JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical_low\": ${CRITICAL_LEVEL_LOW}, \"critical_high\": ${CRITICAL_LEVEL_HIGH}, \"warning_low\": ${WARNING_LEVEL_LOW}, \"warning_high\": ${WARNING_LEVEL_HIGH}}"
       # echo "${JSON}" | jq . 1>&2
+      # Santiychcek critical and warning levels
+      if [ ${COMPARISON_METHOD} != "ne" ]; then
+          echo "${CRITICAL_LEVEL_LOW} ${COMPARISON_OPERATOR} ${PROMETHEUS_RESULT} ${COMPARISON_OPERATOR} ${CRITICAL_LEVEL_HIGH}" 1>&2
+          echo "${WARNING_LEVEL_LOW} ${COMPARISON_OPERATOR} ${PROMETHEUS_RESULT} ${COMPARISON_OPERATOR} ${WARNING_LEVEL_HIGH}" 1>&2
+          echo "${JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .critical_high" >/dev/null
+          CRITICAL_LEVEL_OK=$?
+          echo "${JSON}" | jq -e ".warning_low ${COMPARISON_OPERATOR} .warning_high" >/dev/null
+          WARNING_LEVEL_OK=$?
+          if [ ${CRITICAL_LEVEL_OK} -ne 0 ]; then
+            NAGIOS_STATUS=UNKNOWN
+            NAGIOS_SHORT_TEXT="invalid critical range: ${CRITICAL_LEVEL_LOW} ${COMPARISON_OPERATOR} ${CRITICAL_LEVEL_HIGH}"
+            exit
+          fi
+          if [ ${WARNING_LEVEL_OK} -ne 0 ]; then
+            NAGIOS_STATUS=UNKNOWN
+            NAGIOS_SHORT_TEXT="invalid warning range: ${WARNING_LEVEL_LOW} ${COMPARISON_OPERATOR} ${WARNING_LEVEL_HIGH}"
+            exit
+          fi
+      fi
       # Evaluate critical and warning levels
       echo "${JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .value and .value ${COMPARISON_OPERATOR} .critical_high" >/dev/null
       CRITICAL=$?
