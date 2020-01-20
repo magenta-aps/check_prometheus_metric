@@ -63,4 +63,10 @@ echo "Waiting until prometheus sees pushed metric"
 wait_for_metric "scalar(pi)" ${PROMETHEUS_PORT}
 echo ""
 
+echo "
+PLUGIN_SCRIPT=${PLUGIN_SCRIPT}
+PROMETHEUS_PORT=${PROMETHEUS_PORT}
+PUSHGATEWAY_PORT=${PUSHGATEWAY_PORT}
+" > tests/test_config.bash
+
 bats tests/*.bats

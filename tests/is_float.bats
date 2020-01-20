@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-load parse
+load ../parse
 
 # Test is_float
 #--------------

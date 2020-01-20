@@ -5,14 +5,14 @@ INTERVAL_REGEX="([~]|${FLOAT_REGEX}):(${FLOAT_REGEX})?"
 
 function is_inverted {
     # Inverted if string starts with @
-    local _IS_INVERTED=0
+    local _IS_INVERTED
     echo "${1}" | grep -E "^@" -c >/dev/null
     _IS_INVERTED=$?
     return ${_IS_INVERTED}
 }
 
 function is_float() {
-    local _IS_FLOAT=0
+    local _IS_FLOAT
     echo "${1}" | grep -E "^${FLOAT_REGEX}$" -c >/dev/null
     _IS_FLOAT=$?
     return ${_IS_FLOAT}

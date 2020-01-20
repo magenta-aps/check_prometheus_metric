@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-load parse
+load ../parse
 
 # Test decode_range
-#--------------
+#------------------
 @test "Test valid range: ''" {
   RANGE="$(! decode_range '' 2>&1)"
   [ "${RANGE}" == "Unable to parse range" ]

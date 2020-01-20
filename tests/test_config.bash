@@ -1,0 +1,5 @@
+
+PLUGIN_SCRIPT=check_prometheus_metric.sh
+PROMETHEUS_PORT=8090
+PUSHGATEWAY_PORT=8091
+

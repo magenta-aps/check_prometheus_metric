@@ -23,6 +23,20 @@ function check() {
     fi
 }
 
+function test_line() {
+    # Loop through each test-case
+    while IFS= read -r line; do
+        PARAMETERS=$(echo "$line" | cut -f1 -d'#')
+        EXPECTED=$(echo "$line" | cut -f2 -d'#')
+        OUTPUT=$(bash ${PLUGIN_SCRIPT} -H "${PROMETHEUS_SERVER}" ${PARAMETERS} -n "tc")
+        EXIT_CODE=$?
+        RESULT=$(echo "${OUTPUT}" | head -1)
+        check "$RESULT" "$EXPECTED" "$line" "$EXIT_CODE"
+    done <<< "$1"
+}
+
+
+
 function parameterized_tests() {
     # Loop through each test-case
     while IFS= read -r line; do
