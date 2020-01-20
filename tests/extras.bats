@@ -164,7 +164,9 @@ load test_utils
 }
 @test "Test -q scalar(vector(1)) -w 2 -c 3 -t vector" {
   OUTPUT="${test_parameters '-q scalar(vector(1) -w 2 -c 3 -t vector')"
-  [ "$OUTPUT}" == "#UNKNOWN - deprecated argument provided: -t vector"
+  [ "$OUTPUT}" == "UNKNOWN - deprecated argument provided: -t vector"
 }
-
-#-q scalar(vector(1)) -w 2 -c 3 -t scalar #UNKNOWN - deprecated argument provided: -t scalar
+@test "Test -q scalar(vector(1)) -w 2 -c 3 -t scalar" {
+  OUTPUT="$(test_parameters '-q scalar(vector(1)) -w 2 -c 3 -t scalar')"
+  [ "$OUTPUT}" == "UNKNOWN - deprecated argument provided: -t scalar" ]
+}

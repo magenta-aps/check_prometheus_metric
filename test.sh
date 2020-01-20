@@ -7,7 +7,7 @@ PROMETHEUS_PORT=8090
 PUSHGATEWAY_NAME=nagios_plugins_pushgateway
 PUSHGATEWAY_PORT=8091
 
-source tests/utils.sh
+source tests/test_utils.bash
 
 echo ""
 echo "Creating configuration file"
