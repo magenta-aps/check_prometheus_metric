@@ -166,21 +166,13 @@ load test_utils
 }
 
 # Invalid warning / critical argument
-@test "Test -q 1 -w 2 -c -1" {
-  OUTPUT="$(test_parameters '-q 1 -w 2 -c -1')"
-  [ "${OUTPUT}" == "UNKNOWN - -c CRITICAL_LEVEL requires an integer or interval" ]
-}
-@test "Test -q 1 -w -1 -c 3" {
-  OUTPUT="$(test_parameters '-q 1 -w -1 -c 3')"
-  [ "${OUTPUT}" == "UNKNOWN - -w WARNING_LEVEL requires an integer or interval" ]
-}
 @test "Test -q 1 -w 2 -c one" {
   OUTPUT="$(test_parameters '-q 1 -w 2 -c one')"
-  [ "${OUTPUT}" == "UNKNOWN - -c CRITICAL_LEVEL requires an integer or interval" ]
+  [ "${OUTPUT}" == "UNKNOWN - -c CRITICAL_LEVEL requires a float or interval" ]
 }
 @test "Test -q 1 -w one -c 3" {
   OUTPUT="$(test_parameters '-q 1 -w one -c 3')"
-  [ "${OUTPUT}" == "UNKNOWN - -w WARNING_LEVEL requires an integer or interval" ]
+  [ "${OUTPUT}" == "UNKNOWN - -w WARNING_LEVEL requires a float or interval" ]
 }
 
 # Invalid comparision operator

@@ -60,8 +60,8 @@ function usage() {
   Options:
     -H HOST          URL of Prometheus host to query.
     -q QUERY         Prometheus query, in single quotes, that returns by default a float or int (see -t).
-    -w INT[:INT]     Warning level value (must be a positive integer or interval).
-    -c INT[:INT]     Critical level value (must be a positive integer or interval).
+    -w FLOAT[:FLOAT] Warning level value (must be a float or nagios-interval).
+    -c FLOAT[:FLOAT] Critical level value (must be a float or nagios-interval).
     -n NAME          A name for the metric being checked.
     -m METHOD        Comparison method, one of gt, ge, lt, le, eq, ne.
                      (Defaults to ge unless otherwise specified.)
@@ -112,7 +112,7 @@ function process_command_line {
 
       c)        # If malformed
                 if ! is_float_or_interval "${OPTARG}"; then
-                  NAGIOS_SHORT_TEXT='-c CRITICAL_LEVEL requires an integer or interval'
+                  NAGIOS_SHORT_TEXT='-c CRITICAL_LEVEL requires a float or interval'
                   NAGIOS_LONG_TEXT="$(usage)"
                   exit
                 fi
@@ -121,7 +121,7 @@ function process_command_line {
 
       w)        # If malformed
                 if ! is_float_or_interval "${OPTARG}"; then
-                  NAGIOS_SHORT_TEXT='-w WARNING_LEVEL requires an integer or interval'
+                  NAGIOS_SHORT_TEXT='-w WARNING_LEVEL requires a float or interval'
                   NAGIOS_LONG_TEXT="$(usage)"
                   exit
                 fi
