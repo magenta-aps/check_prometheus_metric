@@ -23,11 +23,6 @@ WARNING=1
 CRITICAL=2
 UNKNOWN=3
 
-# Regexes:
-# TODO: Support negative numbers
-INTEGER_REGEX="^[0-9]+$"
-INTERVAL_REGEX="^[0-9]*(\.[0-9]+)?:[0-9]*(\.[0-9]+)?$"
-
 # Variables:
 NAGIOS_STATUS=UNKNOWN
 NAGIOS_SHORT_TEXT='an unknown error occured'

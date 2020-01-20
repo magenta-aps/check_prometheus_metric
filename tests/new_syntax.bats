@@ -77,3 +77,29 @@ load test_utils
   OUTPUT="$(test_parameters '-q -0.0 -w 2 -c 3')"
   [ "${OUTPUT}" == "OK - tc is -0" ]
 }
+
+# Interval base-case
+@test "Test -q -1 -w 0:2 -c 0:3" {
+  OUTPUT="$(test_parameters '-q -1 -w 2 -c 3')"
+  [ "${OUTPUT}" == "CRITICAL - tc is -1" ]
+}
+@test "Test -q 0 -w 0:2 -c 0:3" {
+  OUTPUT="$(test_parameters '-q 0 -w 2 -c 3')"
+  [ "${OUTPUT}" == "OK - tc is 0" ]
+}
+@test "Test -q 1 -w 0:2 -c 0:3" {
+  OUTPUT="$(test_parameters '-q 1 -w 2 -c 3')"
+  [ "${OUTPUT}" == "OK - tc is 1" ]
+}
+@test "Test -q 2 -w 0:2 -c 0:3" {
+  OUTPUT="$(test_parameters '-q 2 -w 2 -c 3')"
+  [ "${OUTPUT}" == "WARNING - tc is 2" ]
+}
+@test "Test -q 3 -w 0:2 -c 0:3" {
+  OUTPUT="$(test_parameters '-q 3 -w 2 -c 3')"
+  [ "${OUTPUT}" == "CRITICAL - tc is 3" ]
+}
+@test "Test -q 4 -w 0:2 -c 0:3" {
+  OUTPUT="$(test_parameters '-q 4 -w 2 -c 3')"
+  [ "${OUTPUT}" == "CRITICAL - tc is 4" ]
+}
