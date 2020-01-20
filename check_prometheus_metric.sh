@@ -2,6 +2,7 @@
 #
 # check_prometheus_metric.sh - Nagios plugin wrapper for checking Prometheus
 #                              metrics. Requires curl and jq to be in $PATH.
+source parse.bash
 
 # Avoid locale complications:
 export LC_ALL=C
@@ -54,7 +55,7 @@ function usage() {
                                metrics. Requires curl and jq to be in $PATH.
 
   Usage:
-  check_prometheus_metric.sh -H HOST -q QUERY -w INT[:INT] -c INT[:INT] -n NAME [-m METHOD] [-O] [-i] [-p] [-t QUERY_TYPE]
+  check_prometheus_metric.sh -H HOST -q QUERY -w FLOAT[:FLOAT] -c FLOAT[:FLOAT] -n NAME [-m METHOD] [-O] [-i] [-p] [-t QUERY_TYPE]
 
   Options:
     -H HOST          URL of Prometheus host to query.
@@ -151,9 +152,7 @@ function process_command_line {
                 ;;
 
       t)        
-                NAGIOS_SHORT_TEXT="deprecated argument provided: -t ${OPTARG}"
-                NAGIOS_LONG_TEXT="$(usage)"
-                exit
+                NAGIOS_LONG_TEXT+="Note: The use of -t is deprecated, as the query-type is derived from the query."
                 ;;
 
       \?)       NAGIOS_SHORT_TEXT="invalid option: -$OPTARG"
@@ -176,86 +175,56 @@ function process_command_line {
      [[ -z ${CRITICAL_LEVEL} ]]
   then
     NAGIOS_SHORT_TEXT='missing required option'
-    NAGIOS_LONG_TEXT="$(usage)"
+    NAGIOS_LONG_TEXT+="$(usage)"
     exit
   fi
 
-  # Derive intervals
-  if is_interval ${CRITICAL_LEVEL}; then
-      CRITICAL_LEVEL_LOW=$(echo ${CRITICAL_LEVEL} | cut -f1 -d':')
-      CRITICAL_LEVEL_HIGH=$(echo ${CRITICAL_LEVEL} | cut -f2 -d':')
-  else
-      if [[ "${COMPARISON_METHOD}" == "gt" ]]; then
-          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
-      fi
-      if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
-          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
-      fi
-      if [[ "${COMPARISON_METHOD}" == "lt" ]]; then
-          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
-          SET_COMPARISON_METHOD="gt"
-      fi
-      if [[ "${COMPARISON_METHOD}" == "le" ]]; then
-          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
-          SET_COMPARISON_METHOD="ge"
-      fi
-      if [[ "${COMPARISON_METHOD}" == "eq" ]]; then
-          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
-          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
-      elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
-          CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL}
-          CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL}
-      fi
-  fi
-  if is_interval ${WARNING_LEVEL}; then
-      WARNING_LEVEL_LOW=$(echo ${WARNING_LEVEL} | cut -f1 -d':')
-      WARNING_LEVEL_HIGH=$(echo ${WARNING_LEVEL} | cut -f2 -d':')
-  else
-      if [[ "${COMPARISON_METHOD}" == "gt" ]]; then
-          WARNING_LEVEL_LOW=${WARNING_LEVEL}
-      fi
-      if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
-          WARNING_LEVEL_LOW=${WARNING_LEVEL}
-      fi
-      if [[ "${COMPARISON_METHOD}" == "lt" ]]; then
-          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
-          SET_COMPARISON_METHOD="gt"
-      fi
-      if [[ "${COMPARISON_METHOD}" == "le" ]]; then
-          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
-          SET_COMPARISON_METHOD="ge"
-      fi
-      if [[ "${COMPARISON_METHOD}" == "eq" ]]; then
-          WARNING_LEVEL_LOW=${WARNING_LEVEL}
-          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
-      elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
-          WARNING_LEVEL_LOW=${WARNING_LEVEL}
-          WARNING_LEVEL_HIGH=${WARNING_LEVEL}
-      fi
-  fi
-  if [[ -n ${SET_COMPARISON_METHOD} ]]; then
-      COMPARISON_METHOD=${SET_COMPARISON_METHOD}
+  if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
+      WARNING_LEVEL="0:$((WARNING_LEVEL - 1))"
+      CRITICAL_LEVEL="0:$((CRITICAL_LEVEL - 1))"
+  elif [[ "${COMPARISON_METHOD}" == "eq" ]]; then
+      WARNING_LEVEL="@${WARNING_LEVEL}:${WARNING_LEVEL}"
+      CRITICAL_LEVEL="@${CRITICAL_LEVEL}:${CRITICAL_LEVEL}"
+  elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
+      WARNING_LEVEL="${WARNING_LEVEL}:${WARNING_LEVEL}"
+      CRITICAL_LEVEL="${CRITICAL_LEVEL}:${CRITICAL_LEVEL}"
+  elif [[ "${COMPARISON_METHOD}" == "lt" ]]; then
+      WARNING_LEVEL="${WARNING_LEVEL}:"
+      CRITICAL_LEVEL="${CRITICAL_LEVEL}:"
+  elif [[ "${COMPARISON_METHOD}" == "le" ]]; then
+      WARNING_LEVEL="$((WARNING_LEVEL + 1)):"
+      CRITICAL_LEVEL="$((CRITICAL_LEVEL + 1)):"
   fi
 
-  CRITICAL_LEVEL_REP_LOW=${CRITICAL_LEVEL_LOW}
-  CRITICAL_LEVEL_REP_HIGH=${CRITICAL_LEVEL_HIGH}
-  WARNING_LEVEL_REP_LOW=${WARNING_LEVEL_LOW}
-  WARNING_LEVEL_REP_HIGH=${WARNING_LEVEL_HIGH}
+  WARNING_RANGE=$(decode_range ${WARNING_LEVEL})
+  WARNING_LEVEL_LOW=$(echo "${WARNING_RANGE}" | cut -f1 -d' ')
+  WARNING_LEVEL_HIGH=$(echo "${WARNING_RANGE}" | cut -f2 -d' ')
+  WARNING_INVERTED=$(echo "${WARNING_RANGE}" | cut -f3 -d' ')
 
-  CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL_LOW:='0'}
-  CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_HIGH:='inf'}
-  WARNING_LEVEL_LOW=${WARNING_LEVEL_LOW:='0'}
-  WARNING_LEVEL_HIGH=${WARNING_LEVEL_HIGH:='inf'}
+  CRITICAL_RANGE=$(decode_range ${CRITICAL_LEVEL})
+  CRITICAL_LEVEL_LOW=$(echo "${CRITICAL_RANGE}" | cut -f1 -d' ')
+  CRITICAL_LEVEL_HIGH=$(echo "${CRITICAL_RANGE}" | cut -f2 -d' ')
+  CRITICAL_INVERTED=$(echo "${CRITICAL_RANGE}" | cut -f3 -d' ')
+ 
+  COMPARISON_OPERATOR="<="
 
-  # List of valid operators
-  COMPARISON_OPERATORS='{"gt": "<", "ge": "<=", "lt": ">", "le": ">=", "eq": "==", "ne": "!="}'
-  # jq query to pick out the selected operator
-  COMPARISON_OPERATOR=$(echo "${COMPARISON_OPERATORS}" | jq -r ".${COMPARISON_METHOD}")
-  # If operator was not found
-  if [ ${COMPARISON_OPERATOR} == 'null' ]; then
-      NAGIOS_SHORT_TEXT="Unable to find comparison method: ${OPTARG}"
-      NAGIOS_LONG_TEXT="$(usage)"
-      exit
+  LEVEL_JSON="{\"critical_low\": ${CRITICAL_LEVEL_LOW}, \"critical_high\": ${CRITICAL_LEVEL_HIGH}, \"warning_low\": ${WARNING_LEVEL_LOW}, \"warning_high\": ${WARNING_LEVEL_HIGH}}"
+  # Sanity check critical and warning levels
+  if [ ${COMPARISON_METHOD} != "ne" ]; then
+      echo "${LEVEL_JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .critical_high" >/dev/null
+      CRITICAL_LEVEL_OK=$?
+      echo "${LEVEL_JSON}" | jq -e ".warning_low ${COMPARISON_OPERATOR} .warning_high" >/dev/null
+      WARNING_LEVEL_OK=$?
+      if [ ${CRITICAL_LEVEL_OK} -ne 0 ]; then
+        NAGIOS_STATUS=UNKNOWN
+        NAGIOS_SHORT_TEXT="invalid critical range: ${CRITICAL_LEVEL_LOW} ${COMPARISON_OPERATOR} ${CRITICAL_LEVEL_HIGH}"
+        exit
+      fi
+      if [ ${WARNING_LEVEL_OK} -ne 0 ]; then
+        NAGIOS_STATUS=UNKNOWN
+        NAGIOS_SHORT_TEXT="invalid warning range: ${WARNING_LEVEL_LOW} ${COMPARISON_OPERATOR} ${WARNING_LEVEL_HIGH}"
+        exit
+      fi
   fi
 }
 
@@ -276,18 +245,14 @@ function get_prometheus_scalar_result {
   _RESULT=$(echo $1 | jq -r '.[1]')
 
   # check result
-  if [[ ${_RESULT} =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
-    printf '%.0F' ${_RESULT} # return an int if result is a number
-  else
-    case "${_RESULT}" in
-      +Inf) printf '%.0F' $(( ${WARNING_LEVEL} + ${CRITICAL_LEVEL} )) # something greater than either level
-            ;;
-      -Inf) printf -- '-1' # something smaller than any level
-            ;;
-      *)    printf '%s' "${_RESULT}" # otherwise return as a string
-            ;;
-    esac
-  fi
+  case "${_RESULT}" in
+    +Inf) printf '%s' 'inf'
+          ;;
+    -Inf) printf '%s' '-inf' 
+          ;;
+    *)    printf '%s' "${_RESULT}" # otherwise return as a string
+          ;;
+  esac
 }
 
 function get_prometheus_vector_value {
@@ -315,11 +280,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     #-------------
     # Function to be trapped on exit
     function on_exit {
-        printf '%s - %s\n' ${NAGIOS_STATUS} "${NAGIOS_SHORT_TEXT}"
-
         if [[ -n ${NAGIOS_LONG_TEXT} ]]; then
             printf '%s\n' "${NAGIOS_LONG_TEXT}"
         fi
+        printf '%s - %s\n' ${NAGIOS_STATUS} "${NAGIOS_SHORT_TEXT}"
         # Indirect variable reference
         exit ${!NAGIOS_STATUS}
     }
@@ -338,7 +302,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     PROMETHEUS_RAW_RESULT=$(echo "${PROMETHEUS_RAW_RESPONSE}" | jq -r '.data.result')
 
     # extract the metric value from the raw prometheus result
-    if [[ "${PROMETHEUS_QUERY_TYPE}" = "scalar" ]]; then
+    if [[ "${PROMETHEUS_QUERY_TYPE}" == "scalar" ]]; then
         PROMETHEUS_RESULT=$( get_prometheus_scalar_result "$PROMETHEUS_RAW_RESULT" )
         PROMETHEUS_METRIC=UNKNOWN
     else
@@ -348,39 +312,20 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
 
     # check the value
-    if [[ ${PROMETHEUS_RESULT} =~ ^-?[0-9]+$ ]]; then
-      # JSON raw data
-      JSON="{\"value\": ${PROMETHEUS_RESULT}, \"critical_low\": ${CRITICAL_LEVEL_LOW}, \"critical_high\": ${CRITICAL_LEVEL_HIGH}, \"warning_low\": ${WARNING_LEVEL_LOW}, \"warning_high\": ${WARNING_LEVEL_HIGH}}"
-      # echo "${JSON}" | jq . 1>&2
-      # Santiychcek critical and warning levels
-      if [ ${COMPARISON_METHOD} != "ne" ]; then
-          echo "${CRITICAL_LEVEL_LOW} ${COMPARISON_OPERATOR} ${PROMETHEUS_RESULT} ${COMPARISON_OPERATOR} ${CRITICAL_LEVEL_HIGH}" 1>&2
-          echo "${WARNING_LEVEL_LOW} ${COMPARISON_OPERATOR} ${PROMETHEUS_RESULT} ${COMPARISON_OPERATOR} ${WARNING_LEVEL_HIGH}" 1>&2
-          echo "${JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .critical_high" >/dev/null
-          CRITICAL_LEVEL_OK=$?
-          echo "${JSON}" | jq -e ".warning_low ${COMPARISON_OPERATOR} .warning_high" >/dev/null
-          WARNING_LEVEL_OK=$?
-          if [ ${CRITICAL_LEVEL_OK} -ne 0 ]; then
-            NAGIOS_STATUS=UNKNOWN
-            NAGIOS_SHORT_TEXT="invalid critical range: ${CRITICAL_LEVEL_LOW} ${COMPARISON_OPERATOR} ${CRITICAL_LEVEL_HIGH}"
-            exit
-          fi
-          if [ ${WARNING_LEVEL_OK} -ne 0 ]; then
-            NAGIOS_STATUS=UNKNOWN
-            NAGIOS_SHORT_TEXT="invalid warning range: ${WARNING_LEVEL_LOW} ${COMPARISON_OPERATOR} ${WARNING_LEVEL_HIGH}"
-            exit
-          fi
-      fi
+    if is_float ${PROMETHEUS_RESULT}; then
+      JSON=$(echo "${LEVEL_JSON} {\"value\": ${PROMETHEUS_RESULT}}" | jq -s add)
       # Evaluate critical and warning levels
       echo "${JSON}" | jq -e ".critical_low ${COMPARISON_OPERATOR} .value and .value ${COMPARISON_OPERATOR} .critical_high" >/dev/null
       CRITICAL=$?
       echo "${JSON}" | jq -e ".warning_low ${COMPARISON_OPERATOR} .value and .value ${COMPARISON_OPERATOR} .warning_high" >/dev/null
       WARNING=$?
+      # echo "${CRITICAL_LEVEL_LOW} ${COMPARISON_OPERATOR} ${PROMETHEUS_RESULT} ${COMPARISON_OPERATOR} ${CRITICAL_LEVEL_HIGH}" 1>&2
+      # echo "${WARNING_LEVEL_LOW} ${COMPARISON_OPERATOR} ${PROMETHEUS_RESULT} ${COMPARISON_OPERATOR} ${WARNING_LEVEL_HIGH}" 1>&2
 
-      if [ ${CRITICAL} -eq 0 ]; then
+      if [ ${CRITICAL} -ne ${CRITICAL_INVERTED} ]; then
         NAGIOS_STATUS=CRITICAL
         NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
-      elif [ ${WARNING} -eq 0 ]; then
+      elif [ ${WARNING} -ne ${WARNING_INVERTED} ]; then
         NAGIOS_STATUS=WARNING
         NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
       else
@@ -402,7 +347,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     if [[ "${PERFDATA}" = "true" ]]; then
         # Bake performance data
         PERF_DATA=""
-        PERF_DATA+="query_result=${PROMETHEUS_RESULT};${WARNING_LEVEL_REP_LOW}:${WARNING_LEVEL_REP_HIGH};${CRITICAL_LEVEL_REP_LOW}:${CRITICAL_LEVEL_REP_HIGH};0 "
+        PERF_DATA+="query_result=${PROMETHEUS_RESULT};${WARNING_LEVEL};${CRITICAL_LEVEL};U;U "
 
         NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT} | ${PERF_DATA}"
     fi

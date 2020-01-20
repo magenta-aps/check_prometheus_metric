@@ -38,10 +38,10 @@ function decode_range() {
     # Output variables
     local _START="0"
     local _END="inf"
-    local _INVERTED=""
+    local _INVERTED="0"
     # Check if inverted
     if is_inverted "${_INPUT}"; then
-        _INVERTED=" inverted"
+        _INVERTED="1"
         # Remove @ from string
         _INPUT="${_INPUT:1}"
     fi
@@ -64,7 +64,7 @@ function decode_range() {
     # Strip prefix +
     _START=$(echo ${_START} | cut -f2 -d'+')
     _END=$(echo ${_END} | cut -f2 -d'+')
-    # NOTE: Intentionally no space for _INVERTED
-    printf '%s' "${_START} ${_END}${_INVERTED}"
+    # Output space-seperated string
+    printf '%s' "${_START} ${_END} ${_INVERTED}"
     return 0
 }

@@ -13,57 +13,57 @@ load ../parse
 }
 @test "Test valid range: 10" {
   RANGE="$(decode_range '10')"
-  [ "${RANGE}" == "0 10" ]
+  [ "${RANGE}" == "0 10 0" ]
 }
 @test "Test valid range: @10" {
   RANGE="$(decode_range '@10')"
-  [ "${RANGE}" == "0 10 inverted" ]
+  [ "${RANGE}" == "0 10 1" ]
 }
 @test "Test valid range: +3.14" {
   RANGE="$(decode_range '+3.14')"
-  [ "${RANGE}" == "0 3.14" ]
+  [ "${RANGE}" == "0 3.14 0" ]
 }
 @test "Test valid range: 10:" {
   RANGE="$(decode_range '10:')"
-  [ "${RANGE}" == "10 inf" ]
+  [ "${RANGE}" == "10 inf 0" ]
 }
 @test "Test valid range: @10:" {
   RANGE="$(decode_range '@10:')"
-  [ "${RANGE}" == "10 inf inverted" ]
+  [ "${RANGE}" == "10 inf 1" ]
 }
 @test "Test valid range: +3.14:" {
   RANGE="$(decode_range '+3.14:')"
-  [ "${RANGE}" == "3.14 inf" ]
+  [ "${RANGE}" == "3.14 inf 0" ]
 }
 @test "Test valid range: ~:10" {
   RANGE="$(decode_range '~:10')"
-  [ "${RANGE}" == "-inf 10" ]
+  [ "${RANGE}" == "-inf 10 0" ]
 }
 @test "Test valid range: ~:+3.14" {
   RANGE="$(decode_range '~:+3.14')"
-  [ "${RANGE}" == "-inf 3.14" ]
+  [ "${RANGE}" == "-inf 3.14 0" ]
 }
 @test "Test valid range: 10:20" {
   RANGE="$(decode_range '10:20')"
-  [ "${RANGE}" == "10 20" ]
+  [ "${RANGE}" == "10 20 0" ]
 }
 @test "Test valid range: +3.14:+42" {
   RANGE="$(decode_range '+3.14:+42')"
-  [ "${RANGE}" == "3.14 42" ]
+  [ "${RANGE}" == "3.14 42 0" ]
 }
 @test "Test valid range: @10:20" {
   RANGE="$(decode_range '@10:20')"
-  [ "${RANGE}" == "10 20 inverted" ]
+  [ "${RANGE}" == "10 20 1" ]
 }
 @test "Test valid range: @+3.14:+42" {
   RANGE="$(decode_range '@+3.14:+42')"
-  [ "${RANGE}" == "3.14 42 inverted" ]
+  [ "${RANGE}" == "3.14 42 1" ]
 }
 @test "Test valid range: @-3.14:+42.11" {
   RANGE="$(decode_range '@-3.14:+42')"
-  [ "${RANGE}" == "-3.14 42 inverted" ]
+  [ "${RANGE}" == "-3.14 42 1" ]
 }
 @test "Test valid range: @~:+3.14" {
   RANGE="$(decode_range '@~:+3.14')"
-  [ "${RANGE}" == "-inf 3.14 inverted" ]
+  [ "${RANGE}" == "-inf 3.14 1" ]
 }
