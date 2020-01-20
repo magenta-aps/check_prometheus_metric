@@ -242,9 +242,9 @@ function process_command_line {
   WARNING_LEVEL_REP_LOW=${WARNING_LEVEL_LOW}
   WARNING_LEVEL_REP_HIGH=${WARNING_LEVEL_HIGH}
 
-  CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL_LOW:='-inf'}
+  CRITICAL_LEVEL_LOW=${CRITICAL_LEVEL_LOW:='0'}
   CRITICAL_LEVEL_HIGH=${CRITICAL_LEVEL_HIGH:='inf'}
-  WARNING_LEVEL_LOW=${WARNING_LEVEL_LOW:='-inf'}
+  WARNING_LEVEL_LOW=${WARNING_LEVEL_LOW:='0'}
   WARNING_LEVEL_HIGH=${WARNING_LEVEL_HIGH:='inf'}
 
   # List of valid operators
@@ -276,8 +276,7 @@ function get_prometheus_scalar_result {
   _RESULT=$(echo $1 | jq -r '.[1]')
 
   # check result
-  if [[ ${_RESULT} =~ ^-?[0-9]+\.?[0-9]*$ ]]
-  then
+  if [[ ${_RESULT} =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
     printf '%.0F' ${_RESULT} # return an int if result is a number
   else
     case "${_RESULT}" in
@@ -389,8 +388,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
       fi
     else
-      if [[ "${NAN_OK}" = "true" && "${PROMETHEUS_RESULT}" = "NaN" ]]
-      then
+      if [[ "${NAN_OK}" = "true" && "${PROMETHEUS_RESULT}" = "NaN" ]]; then
         NAGIOS_STATUS=OK
         NAGIOS_SHORT_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
       else    
@@ -398,12 +396,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         NAGIOS_LONG_TEXT="${METRIC_NAME} is ${PROMETHEUS_RESULT}"
       fi
     fi
-    if [[ "${NAGIOS_INFO}" = "true" ]]
-    then
+    if [[ "${NAGIOS_INFO}" = "true" ]]; then
         NAGIOS_SHORT_TEXT="${NAGIOS_SHORT_TEXT}: ${PROMETHEUS_METRIC}"
     fi
-    if [[ "${PERFDATA}" = "true" ]]
-    then
+    if [[ "${PERFDATA}" = "true" ]]; then
         # Bake performance data
         PERF_DATA=""
         PERF_DATA+="query_result=${PROMETHEUS_RESULT};${WARNING_LEVEL_REP_LOW}:${WARNING_LEVEL_REP_HIGH};${CRITICAL_LEVEL_REP_LOW}:${CRITICAL_LEVEL_REP_HIGH};0 "

@@ -63,15 +63,4 @@ echo "Waiting until prometheus sees pushed metric"
 wait_for_metric "scalar(pi)" ${PROMETHEUS_PORT}
 echo ""
 
-TOTAL_FAILED_TESTS=0
-echo ""
-echo "Running test scripts"
-for script in $(ls tests/test_*.sh); do
-    echo "Running: ${script}"
-    bash ${script} ${PLUGIN_SCRIPT} ${PROMETHEUS_PORT} ${PUSHGATEWAY_PORT}
-    FAILED_TESTS=$?
-    TOTAL_FAILED_TESTS=$((TOTAL_FAILED_TESTS + FAILED_TESTS))
-    echo "Failed tests so far: ${TOTAL_FAILED_TESTS}"
-    echo ""
-done
-exit ${TOTAL_FAILED_TESTS}
+bats tests/*.bats
