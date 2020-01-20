@@ -84,20 +84,8 @@ function usage() {
 EoL
 }
 
-function is_integer() {
-    echo "${1}" | grep -E "${INTEGER_REGEX}" -c >/dev/null
-    IS_INTEGER=$?
-    return ${IS_INTEGER}
-}
-
-function is_interval() {
-    echo "${1}" | grep -E "${INTERVAL_REGEX}" -c >/dev/null
-    IS_INTERVAL=$?
-    return ${IS_INTERVAL}
-}
-
-function is_integer_or_interval() {
-    if is_integer "${1}" || is_interval "${1}"; then
+function is_float_or_interval() {
+    if is_float "${1}" || is_interval "${1}"; then
         return 0
     fi
     return 1
@@ -123,7 +111,7 @@ function process_command_line {
                 ;;
 
       c)        # If malformed
-                if ! is_integer_or_interval "${OPTARG}"; then
+                if ! is_float_or_interval "${OPTARG}"; then
                   NAGIOS_SHORT_TEXT='-c CRITICAL_LEVEL requires an integer or interval'
                   NAGIOS_LONG_TEXT="$(usage)"
                   exit
@@ -132,7 +120,7 @@ function process_command_line {
                 ;;
 
       w)        # If malformed
-                if ! is_integer_or_interval "${OPTARG}"; then
+                if ! is_float_or_interval "${OPTARG}"; then
                   NAGIOS_SHORT_TEXT='-w WARNING_LEVEL requires an integer or interval'
                   NAGIOS_LONG_TEXT="$(usage)"
                   exit
@@ -179,21 +167,31 @@ function process_command_line {
     exit
   fi
 
-  if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
-      WARNING_LEVEL="0:$((WARNING_LEVEL - 1))"
-      CRITICAL_LEVEL="0:$((CRITICAL_LEVEL - 1))"
-  elif [[ "${COMPARISON_METHOD}" == "eq" ]]; then
-      WARNING_LEVEL="@${WARNING_LEVEL}:${WARNING_LEVEL}"
-      CRITICAL_LEVEL="@${CRITICAL_LEVEL}:${CRITICAL_LEVEL}"
-  elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
-      WARNING_LEVEL="${WARNING_LEVEL}:${WARNING_LEVEL}"
-      CRITICAL_LEVEL="${CRITICAL_LEVEL}:${CRITICAL_LEVEL}"
-  elif [[ "${COMPARISON_METHOD}" == "lt" ]]; then
-      WARNING_LEVEL="${WARNING_LEVEL}:"
-      CRITICAL_LEVEL="${CRITICAL_LEVEL}:"
-  elif [[ "${COMPARISON_METHOD}" == "le" ]]; then
-      WARNING_LEVEL="$((WARNING_LEVEL + 1)):"
-      CRITICAL_LEVEL="$((CRITICAL_LEVEL + 1)):"
+  if is_float "${WARNING_LEVEL}"; then
+      if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
+          WARNING_LEVEL="0:$(echo ${WARNING_LEVEL} | jq '. - 1e-9')"
+      elif [[ "${COMPARISON_METHOD}" == "eq" ]]; then
+          WARNING_LEVEL="@${WARNING_LEVEL}:${WARNING_LEVEL}"
+      elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
+          WARNING_LEVEL="${WARNING_LEVEL}:${WARNING_LEVEL}"
+      elif [[ "${COMPARISON_METHOD}" == "lt" ]]; then
+          WARNING_LEVEL="${WARNING_LEVEL}:"
+      elif [[ "${COMPARISON_METHOD}" == "le" ]]; then
+          WARNING_LEVEL="$(echo ${WARNING_LEVEL} | jq '. + 1e-9'):"
+      fi
+  fi
+  if is_float "${CRITICAL_LEVEL}"; then
+      if [[ "${COMPARISON_METHOD}" == "ge" ]]; then
+          CRITICAL_LEVEL="0:$(echo ${CRITICAL_LEVEL} | jq '. - 1e-9')"
+      elif [[ "${COMPARISON_METHOD}" == "eq" ]]; then
+          CRITICAL_LEVEL="@${CRITICAL_LEVEL}:${CRITICAL_LEVEL}"
+      elif [[ "${COMPARISON_METHOD}" == "ne" ]]; then
+          CRITICAL_LEVEL="${CRITICAL_LEVEL}:${CRITICAL_LEVEL}"
+      elif [[ "${COMPARISON_METHOD}" == "lt" ]]; then
+          CRITICAL_LEVEL="${CRITICAL_LEVEL}:"
+      elif [[ "${COMPARISON_METHOD}" == "le" ]]; then
+          CRITICAL_LEVEL="$(echo ${CRITICAL_LEVEL} | jq '. + 1e-9'):"
+      fi
   fi
 
   WARNING_RANGE=$(decode_range ${WARNING_LEVEL})
