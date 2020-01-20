@@ -2,6 +2,9 @@
 
 load ../parse
 
+@test "--- ${BATS_TEST_FILENAME} ---" {
+  true
+}
 # Test is_float
 #--------------
 # Ordinary floats

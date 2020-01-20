@@ -5,6 +5,9 @@ PROMETHEUS_SERVER=http://localhost:${PROMETHEUS_PORT}
 
 load test_utils
 
+@test "--- ${BATS_TEST_FILENAME} ---" {
+  true
+}
 # Test comparisons
 #-----------------
 # Base-case

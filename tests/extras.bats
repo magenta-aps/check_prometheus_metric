@@ -7,6 +7,9 @@ QUERY_VECTOR_UP="up{instance=\"localhost:9090\"}"
 
 load test_utils
 
+@test "--- ${BATS_TEST_FILENAME} ---" {
+  true
+}
 # Base-case
 @test "Test -q 1 -w 2 -c 3" {
   OUTPUT="$(test_parameters '-q 1 -w 2 -c 3')"

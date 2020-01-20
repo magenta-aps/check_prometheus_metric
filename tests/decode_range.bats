@@ -2,6 +2,9 @@
 
 load ../parse
 
+@test "--- ${BATS_TEST_FILENAME} ---" {
+  true
+}
 # Test decode_range
 #------------------
 @test "Test valid range: ''" {
