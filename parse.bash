@@ -1,5 +1,3 @@
-#!/bin/bash
-
 FLOAT_REGEX="[+-]?([0-9]*[.])?[0-9]+"
 INTERVAL_REGEX="([~]|${FLOAT_REGEX}):(${FLOAT_REGEX})?"
 
