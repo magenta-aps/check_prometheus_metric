@@ -23,6 +23,13 @@ function is_interval() {
     return ${_IS_INTERVAL}
 }
 
+function is_float_or_interval() {
+    if is_float "${1}" || is_interval "${1}"; then
+        return 0
+    fi
+    return 1
+}
+
 function decode_range() {
     # Decode Nagios Threshold format string.
     #

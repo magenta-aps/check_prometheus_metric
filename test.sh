@@ -1,6 +1,5 @@
 #!/bin/bash
 
-PLUGIN_SCRIPT=check_prometheus_metric.sh
 NETWORK_NAME=nagios_plugins_testnetwork
 PROMETHEUS_NAME=nagios_plugins_prometheus
 PROMETHEUS_PORT=8090
@@ -62,6 +61,10 @@ echo ""
 echo "Waiting until prometheus sees pushed metric"
 wait_for_metric "scalar(pi)" ${PROMETHEUS_PORT}
 echo ""
+
+mkdir build/
+bash tools/compile.sh > build/output.sh
+PLUGIN_SCRIPT=build/output.sh
 
 echo "
 PLUGIN_SCRIPT=${PLUGIN_SCRIPT}

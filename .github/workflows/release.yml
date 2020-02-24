@@ -16,7 +16,7 @@ jobs:
       - name: Build shell script for release
         run: |
           mkdir build
-          bash compile.sh > build/output.sh
+          bash tools/compile.sh > build/output.sh
           chmod +x build/output.sh
       - name: Create Release
         id: create_release

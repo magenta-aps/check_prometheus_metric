@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-load ../parse
+load ../src/parse
 
 @test "--- ${BATS_TEST_FILENAME} ---" {
   true
