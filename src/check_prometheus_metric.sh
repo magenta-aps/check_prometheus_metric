@@ -192,7 +192,7 @@ function check_prometheus_server {
     fi
 
     # Check if the prometheus endpoint exists, and can be queried
-    curl -s ${PROMETHEUS_SERVER}/api/v1/query?query=cafebabe | jq -e '.status == "success"' 1>/dev/null 2>/dev/null
+    curl -s "${CURL_OPTS[@]}" ${PROMETHEUS_SERVER}/api/v1/query?query=cafebabe | jq -e '.status == "success"' 1>/dev/null 2>/dev/null
     PROMETHEUS_OK=$?
     if [ "${PROMETHEUS_OK}" -ne 0 ]; then
         NAGIOS_STATUS=UNKNOWN
