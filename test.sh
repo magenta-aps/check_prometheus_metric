@@ -7,13 +7,16 @@ PUSHGATEWAY_NAME=nagios_plugins_pushgateway
 PUSHGATEWAY_PORT=9091
 ICINGA_NAME=icinga2
 ICINGA_PORT=5665
+NGINX_NAME=nagios_plugins_nginx
+NGINX_PORT=8022
 
 PLUGIN_SCRIPT=build/output.sh
 
 export PLUGIN_SCRIPT=${PLUGIN_SCRIPT}
 export PROMETHEUS_PORT=${PROMETHEUS_PORT}
 export PUSHGATEWAY_PORT=${PUSHGATEWAY_PORT}
-export ICINGA_PORT=5665
+export ICINGA_PORT=${ICINGA_PORT}
+export NGINX_PORT=${NGINX_PORT}
 
 source tests/test_utils.bash
 
@@ -23,6 +26,7 @@ start_docker_network
 start_prometheus
 start_pushgateway
 start_icinga
+start_nginx_basic_auth
 
 set_metric "pi" "3.14"
 

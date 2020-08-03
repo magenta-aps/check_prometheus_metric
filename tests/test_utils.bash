@@ -50,6 +50,52 @@ function start_docker_network() {
     docker network create ${NETWORK_NAME}
 }
 
+function start_nginx_basic_auth() {
+    echo ""
+    echo "Creating configuration file"
+    CONFIG_FILE=$(mktemp --suffix=.conf)
+    chmod 666 ${CONFIG_FILE}
+    echo "${CONFIG_FILE}"
+
+    echo ""
+    echo "Templating configuration file"
+    cp tests/configuration/nginx.conf ${CONFIG_FILE}
+    sed -e "s/\${PROMETHEUS_NAME}/${PROMETHEUS_NAME}/" -i ${CONFIG_FILE}
+
+    echo ""
+    echo "Preparing htpasswd file"
+    HTPASSWD_FILE=$(mktemp)
+    chmod 666 ${HTPASSWD_FILE}
+    echo "${HTPASSWD_FILE}"
+    cp tests/configuration/htpasswd ${HTPASSWD_FILE}
+
+    echo ""
+    echo "Starting nginx container"
+    docker rm -f ${NGINX_NAME}
+    docker run --name ${NGINX_NAME} --net=${NETWORK_NAME} -d -p ${NGINX_PORT}:80 -v ${CONFIG_FILE}:/etc/nginx/nginx.conf:ro -v ${HTPASSWD_FILE}:/etc/nginx/.htpasswd:ro nginx
+
+    echo ""
+    echo "Waiting until nginx is up"
+    until $(curl --output /dev/null --silent --fail http://localhost:${NGINX_PORT}/health); do
+        printf '.'
+        sleep 1
+    done
+}
+
+function start_pushgateway() {
+    echo ""
+    echo "Starting pushgateway container"
+    docker rm -f ${PUSHGATEWAY_NAME}
+    docker run --name ${PUSHGATEWAY_NAME} --net=${NETWORK_NAME} -d -p ${PUSHGATEWAY_PORT}:9091 prom/pushgateway
+
+    echo ""
+    echo "Waiting until pushgateway is up"
+    until $(curl --output /dev/null --silent --fail http://localhost:${PUSHGATEWAY_PORT}); do
+        printf '.'
+        sleep 1
+    done
+}
+
 function start_prometheus() {
     echo ""
     echo "Creating configuration file"
@@ -64,7 +110,7 @@ function start_prometheus() {
     echo ""
     echo "Starting prometheus container"
     docker rm -f ${PROMETHEUS_NAME}
-    docker run --name ${PROMETHEUS_NAME} --net=${NETWORK_NAME} -d -p ${PROMETHEUS_PORT}:9090 -v ${CONFIG_FILE}:/etc/prometheus/prometheus.yml prom/prometheus
+    docker run --name ${PROMETHEUS_NAME} --net=${NETWORK_NAME} -d -p ${PROMETHEUS_PORT}:9090 -v ${CONFIG_FILE}:/etc/prometheus/prometheus.yml:ro prom/prometheus
 
     echo ""
     echo "Waiting until prometheus is up"

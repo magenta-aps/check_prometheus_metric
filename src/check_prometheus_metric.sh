@@ -196,7 +196,7 @@ function check_prometheus_server {
     PROMETHEUS_OK=$?
     if [ "${PROMETHEUS_OK}" -ne 0 ]; then
         NAGIOS_STATUS=UNKNOWN
-        NAGIOS_SHORT_TEXT="unable to query proemtheus endpoint!"
+        NAGIOS_SHORT_TEXT="unable to query prometheus endpoint!"
         exit
     fi
 }
