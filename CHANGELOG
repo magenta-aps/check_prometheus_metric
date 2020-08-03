@@ -1,3 +1,8 @@
+0.0.5
+=====
+Fixed trailing whitespace (#2)
+Fixed a bug with not passing curl context on all calls (#3)
+
 0.0.4
 =====
 Added CHANGELOG

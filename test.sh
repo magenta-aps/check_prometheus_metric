@@ -1,5 +1,4 @@
 #!/bin/bash
-
 NETWORK_NAME=nagios_plugins_testnetwork
 PROMETHEUS_NAME=nagios_plugins_prometheus
 PROMETHEUS_PORT=9090
@@ -37,6 +36,12 @@ echo ""
 
 echo "Ordinary tests"
 bats tests/*.bats
+ORDINARY_TESTS_STATUS=$?
+echo "Ordinary tests status: ${ORDINARY_TESTS_STATUS}"
 
 echo "Integration tests"
 bats tests/icinga/*.bats
+INTEGRATION_TESTS_STATUS=$?
+echo "Integration tests status: ${INTEGRATION_TESTS_STATUS}"
+
+! (( ${ORDINARY_TESTS_STATUS} || ${INTEGRATION_TESTS_STATUS} ))
