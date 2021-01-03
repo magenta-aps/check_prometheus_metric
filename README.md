@@ -26,6 +26,7 @@ Nagios plugin for alerting on Prometheus query results.
                      Options and option values must be passed separately.
                      e.g. -C --connect-timeout -C 10 -C --cacert -C /path/to/ca.crt
     -O               Accept NaN as an "OK" result.
+    -E               Accept an empty vector (null) as an "OK" result.
     -i               Print the extra metric information into the Nagios message.
     -p               Add perfdata to check output.
 
