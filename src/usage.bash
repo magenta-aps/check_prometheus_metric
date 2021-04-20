@@ -20,6 +20,7 @@ function usage() {
                      Options and option values must be passed separately.
                      e.g. -C --connect-timeout -C 10 -C --cacert -C /path/to/ca.crt
     -O               Accept NaN as an "OK" result.
+    -0               Accept null as an "OK" result.
     -i               Print the extra metric information into the Nagios message.
     -p               Add perfdata to check output.
 
