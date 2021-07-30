@@ -183,7 +183,7 @@ function process_command_line {
 
 function check_prometheus_server {
     # Check that the server URL responds
-    curl --silent --head ${PROMETHEUS_SERVER}/api/v1/query > /dev/null
+    curl "${CURL_OPTS[@]}" --silent --head ${PROMETHEUS_SERVER}/api/v1/query > /dev/null
     SERVER_RESPONDED=$?
     if [ "${SERVER_RESPONDED}" -ne 0 ]; then
         NAGIOS_STATUS=UNKNOWN
