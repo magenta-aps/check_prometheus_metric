@@ -91,7 +91,6 @@ function process_command_line {
       E)        NULL_OK="true"
                 ;;
 
-
       i)        NAGIOS_INFO="true"
                 ;;
 
