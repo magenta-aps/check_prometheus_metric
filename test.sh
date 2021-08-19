@@ -28,10 +28,12 @@ start_icinga
 start_nginx_basic_auth
 
 set_metric "pi" "3.14"
+set_metric "negative" "-11"
 
 echo ""
 echo "Waiting until prometheus sees pushed metric"
 wait_for_metric "scalar(pi)" 3.14
+wait_for_metric "scalar(negative)" -11
 echo ""
 
 echo "Ordinary tests"
