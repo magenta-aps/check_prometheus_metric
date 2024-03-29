@@ -83,7 +83,7 @@ object CheckCommand "check_prometheus_metric" {
 ```
 GIT_REPO=https://github.com/magenta-aps/check_prometheus_metric
 VERSION=$(curl -sL -H "Accept: application/json" ${GIT_REPO}/releases/latest | jq -r .tag_name)
-curl -sL -o . ${GIT_REPO}/releases/download/${VERSION}/check_prometheus_metric.sh
+curl -sL -O ${GIT_REPO}/releases/download/${VERSION}/check_prometheus_metric.sh
 chmod +x check_prometheus_metric.sh
 sudo mv check_prometheus_metric.sh /usr/lib/nagios/plugins/check_prometheus_metric
 ```
